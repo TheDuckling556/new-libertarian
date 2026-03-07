@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NEW LIBERTARIAN</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+<header>
+  <div class="site-title">New Libertarian</div>
+  <div class="site-tagline">Non-Interventionist &nbsp;·&nbsp; Anti-Empire &nbsp;·&nbsp; Pro-Liberty</div>
+  <div class="site-date" id="siteDate"></div>
+</header>
+
+<nav class="cat-nav" id="catNav">
+  <a href="#" class="active" data-cat="all">All</a>
+  <a href="#" data-cat="war">War &amp; Foreign Policy</a>
+  <a href="#" data-cat="economy">Economy</a>
+  <a href="#" data-cat="spending">Gov Spending</a>
+  <a href="#" data-cat="politics">Politics</a>
+  <a href="#" data-cat="government">Government</a>
+</nav>
+
+<div class="container">
+  <div id="loading">Loading...</div>
+  <div id="content" style="display:none"></div>
+</div>
+
+<footer>
+  <a href="/admin">Admin</a> &nbsp;·&nbsp; New Libertarian &nbsp;·&nbsp; Non-interventionist. Anti-empire. Pro-liberty.
+</footer>
+
+<script>
+  const icons = { article: '', video: '▶ ', tweet: '', substack: '', podcast: '♫ ' };
+
+  document.getElementById('siteDate').textContent = new Date().toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', timeZoneName: 'short'
+  });
+
+  function storyHTML(s) {
+    const icon = icons[s.type] || '';
+    return `<div class="story${s.pinned ? ' pinned' : ''}">
+      <a href="${s.url}" target="_blank" rel="noopener">${icon}${s.headline}</a>
+      <div class="story-source">${s.source}</div>
+    </div>`;
+  }
+
+  function chunkInto(arr, n) {
+    const cols = Array.from({ length: n }, () => []);
+    arr.forEach((item, i) => cols[i % n].push(item));
+    return cols;
+  }
+
+  async function loadStories(cat) {
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('content').style.display = 'none';
+
+    const res = await fetch(`/api/stories?category=${cat}`);
+    const stories = await res.json();
+
+    const pinned = stories.filter(s => s.pinned);
+    const rest = stories.filter(s => !s.pinned);
+
+    let html = '';
+
+    // Pinned section — single centered column if few, 3-col if many
+    if (pinned.length > 0) {
+      if (pinned.length <= 4) {
+        html += `<div style="text-align:center;margin-bottom:1.25rem">`;
+        html += `<div class="section-heading" style="border:none;margin-bottom:.5rem">&#9658; Top Stories</div>`;
+        pinned.forEach(s => {
+          html += `<div class="story pinned" style="text-align:center;padding:.28rem 0">
+            <a href="${s.url}" target="_blank" rel="noopener">${s.headline}</a>
+            <div class="story-source">${s.source}</div>
+          </div>`;
+        });
+        html += `</div><hr class="col-divider" />`;
+      } else {
+        const cols = chunkInto(pinned, 3);
+        html += `<div class="section-heading">&#9658; Top Stories</div>`;
+        html += `<div class="columns" style="margin-bottom:1rem">`;
+        cols.forEach(col => {
+          html += `<div>${col.map(storyHTML).join('')}</div>`;
+        });
+        html += `</div><hr class="col-divider" />`;
+      }
+    }
+
+    // Rest in 3 columns
+    if (rest.length > 0) {
+      const cols = chunkInto(rest, 3);
+      html += `<div class="columns">`;
+      cols.forEach(col => {
+        html += `<div>${col.map(storyHTML).join('')}</div>`;
+      });
+      html += `</div>`;
+    }
+
+    if (stories.length === 0) {
+      html = '<p style="text-align:center;color:#444;padding:3rem">No stories yet.</p>';
+    }
+
+    document.getElementById('content').innerHTML = html;
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+  }
+
+  document.getElementById('catNav').addEventListener('click', e => {
+    const link = e.target.closest('a[data-cat]');
+    if (!link) return;
+    e.preventDefault();
+    document.querySelectorAll('.cat-nav a').forEach(a => a.classList.remove('active'));
+    link.classList.add('active');
+    loadStories(link.dataset.cat);
+  });
+
+  loadStories('all');
+</script>
+</body>
+</html>
