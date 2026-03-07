@@ -177,7 +177,13 @@ function adminPage(stories) {
   td{padding:.45rem .5rem;border-bottom:1px solid #111}
   nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem}
   </style></head><body>
-  <nav><h1>New Libertarian — Admin</h1><a href="/admin/logout">Logout</a></nav>
+  <nav><h1>New Libertarian — Admin</h1>
+  <div style="display:flex;gap:1rem;align-items:center">
+    <form method="POST" action="/admin/scrape" style="display:inline">
+      <button type="submit" style="background:#333;color:#e0e0e0;border:1px solid #444;padding:.4rem 1rem;border-radius:4px;cursor:pointer;font-size:.82rem">⟳ Scrape Now</button>
+    </form>
+    <a href="/admin/logout">Logout</a>
+  </div></nav>
   <div class="box"><h3 style="margin-bottom:.9rem;font-size:.9rem;color:#888;text-transform:uppercase;letter-spacing:.05em">Add Story</h3>
   <form method="POST" action="/admin/add"><div class="grid">
     <div class="full"><input name="headline" placeholder="Headline" required /></div>
@@ -249,6 +255,34 @@ app.post('/admin/edit/:id', requireAuth, async (req, res) => {
   stories[idx] = { ...stories[idx], headline, url, source, type, category, pinned: pinned === '1' ? 1 : 0 };
   await saveStories(stories);
   res.redirect('/admin');
+});
+
+// --- Cron endpoint (called by Vercel Cron or manually) ---
+app.get('/api/cron', async (req, res) => {
+  // Protect with a secret token in production
+  const secret = process.env.CRON_SECRET;
+  if (secret && req.headers['authorization'] !== `Bearer ${secret}`) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    const { scrape } = require('./scraper');
+    const added = await scrape(getStories, saveStories);
+    res.json({ ok: true, added });
+  } catch (err) {
+    console.error('Scrape error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Manual scrape trigger from admin
+app.post('/admin/scrape', requireAuth, async (req, res) => {
+  try {
+    const { scrape } = require('./scraper');
+    const added = await scrape(getStories, saveStories);
+    res.redirect(`/admin?scraped=${added}`);
+  } catch (err) {
+    res.redirect('/admin?scrape_error=1');
+  }
 });
 
 // Only listen when running locally (not on Vercel)
