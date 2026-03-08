@@ -198,6 +198,20 @@ function adminPage(stories) {
 }
 
 app.get('/admin/login', (req, res) => res.send(loginPage(req.query.err)));
+// API key endpoint — bypasses session auth for programmatic access
+const API_SECRET = process.env.API_SECRET || ADMIN_PASSWORD;
+app.post('/api/stories', async (req, res) => {
+  const auth = req.headers['x-api-key'];
+  if (auth !== API_SECRET) return res.status(401).json({ error: 'Unauthorized' });
+  const stories = await getStories();
+  const { headline, url, source, type, category, pinned } = req.body;
+  if (!headline || !url) return res.status(400).json({ error: 'headline and url required' });
+  const id = Date.now();
+  stories.unshift({ id, headline, url, source: source || 'Manual', type: type || 'article', category: category || 'general', pinned: pinned ? 1 : 0, created_at: new Date().toISOString() });
+  await saveStories(stories, id + 1);
+  res.json({ ok: true, id });
+});
+
 app.post('/admin/login', (req, res) => {
   if (req.body.password === ADMIN_PASSWORD) { req.session.authenticated = true; res.redirect('/admin'); }
   else res.redirect('/admin/login?err=1');
